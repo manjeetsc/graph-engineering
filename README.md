@@ -1,17 +1,17 @@
 # Graph Engineering
 
-A working toolkit for coordinating more than one AI agent on a task — deciding when you
+A working toolkit for coordinating more than one AI agent on a task, deciding when you
 actually need to, and a set of skills that do the coordinating for you.
 
 ## Why this exists
 
 Most of the time, one agent doing one job, checking its own work, and trying again when it's
-wrong, is all you need. I kept running into tasks where that stopped being true — where one
+wrong, is all you need. I kept running into tasks where that stopped being true, where one
 agent was quietly trying to be a researcher, a writer, and its own reviewer all at once, and
 every one of those jobs suffered for it.
 
-Splitting a task like that into several smaller, specialized agents — each with one job, and
-clear rules for what gets handed from one to the next — is what I've been calling graph
+Splitting a task like that into several smaller, specialized agents (each with one job, and
+clear rules for what gets handed from one to the next) is what I've been calling graph
 engineering. This repo isn't a description of that idea. It's a working implementation of
 it: skills that actually plan a task into pieces, run those pieces, check each one, repair
 what fails, and hand you back a finished result.
@@ -21,46 +21,62 @@ what fails, and hand you back a finished result.
 Picture a task broken into pieces, where each piece is done by its own agent, and there's an
 explicit plan for what moves between them. That's the whole idea. Three parts, always:
 
-- **Nodes** — a piece of work with one clear job. "Researcher." "Security reviewer." Not
+- **Nodes**: a piece of work with one clear job. "Researcher." "Security reviewer." Not
   "step 3."
-- **Edges** — how work moves from node to node. Sometimes that's a judgment call made after
+- **Edges**: how work moves from node to node. Sometimes that's a judgment call made after
   seeing a node's output; sometimes it's fixed ahead of time and doesn't change no matter
-  what the output says. Most edges here point forward; occasionally one points backward —
-  send the work back to an earlier node with specific feedback, and let it try again.
-- **A contract per node** — what that node must produce, written concretely enough that
+  what the output says. Most edges here point forward; occasionally one points backward,
+  sending the work back to an earlier node with specific feedback, and letting it try again.
+- **A contract per node**: what that node must produce, written concretely enough that
   meeting it can actually be checked, by another agent or by a plain mechanical test. "A
   findings list with file, line, issue, and why it matters" is a contract. "Good analysis" is
-  not — nobody can tell whether that was met, including the node that produced it.
+  not: nobody can tell whether that was met, including the node that produced it.
+
+```mermaid
+flowchart LR
+    N1["Node: Researcher\none clear job"] -->|edge| N2["Node: Writer\ncontract: draft + citations"]
+    N2 -->|edge| N3["Node: Reviewer\ncontract: pass/fail vs. bar"]
+    N3 -.->|edge back, with feedback| N2
+    N3 -->|edge, on pass| OUT(("Finished result"))
+```
 
 More agents are more expensive and slower to debug than one good agent, so this isn't the
 default. Before splitting anything up, it's worth asking: would a clearer instruction handle
 this? Is one step really trying to judge several different things at once, when narrowing it
 would fix that without adding more steps? Do the pieces genuinely need different
-instructions, tools, or models — or genuine parallelism, or fixed and auditable routing —
+instructions, tools, or models, or genuine parallelism, or fixed and auditable routing,
 and not just "more of the same work" wearing a different label? If none of that's true, a
 single well-instructed agent is the right answer, and every skill in this repo checks for
 that before doing anything else.
 
-## Loop engineering — the layer this sits on top of
+## Loop engineering: the layer this sits on top of
 
 Zoom into any one node here and you'll find something smaller and more familiar: an agent
-doing its work, getting checked, and trying again if it's wrong. That's a loop — one agent,
+doing its work, getting checked, and trying again if it's wrong. That's a loop: one agent,
 running its own discover-do-verify-retry cycle, on its own. People have been calling the
 practice of designing that cycle well "loop engineering": deciding what the agent looks at
-before it starts, what "done" actually means, and — the part that's easiest to skip and most
-costly to skip — who's allowed to say no to its own work. A loop with no real check is just an
+before it starts, what "done" actually means, and, the part that's easiest to skip and most
+costly to skip, who's allowed to say no to its own work. A loop with no real check is just an
 agent nodding at itself, agreeing that whatever it produced must be fine.
+
+```mermaid
+flowchart LR
+    S["Discover\nwhat the task needs"] --> D["Do\nthe work"]
+    D --> V["Verify\nan independent check"]
+    V -->|fails| D
+    V -->|passes| Done["Done"]
+```
 
 A graph doesn't replace any of that. It's several of those loops running together, each one
 still doing its own work-check-retry cycle, with an explicit plan for what passes between them
-once each one is done. Graph engineering is not a different discipline from loop engineering —
-it's what loop engineering turns into once one loop, however well-built, can't hold the whole
+once each one is done. Graph engineering is not a different discipline from loop engineering.
+It's what loop engineering turns into once one loop, however well-built, can't hold the whole
 job by itself: the work is really several different jobs, or parts of it can genuinely happen
 at once, or one loop's check was quietly trying to judge three unrelated things.
 
-Practically, that means: if you already have a solid habit for the smaller loop — a good sense
+Practically, that means: if you already have a solid habit for the smaller loop (a good sense
 of what a task actually needs before starting, a real independent check that can say no
-instead of rubber-stamping — every node in a graph here is built to reuse exactly that
+instead of rubber-stamping), every node in a graph here is built to reuse exactly that
 discipline, just once per node instead of once for the whole task. A graph isn't a different
 kind of unit from a loop. It's several of the same kind of unit, coordinated, with the
 handoffs between them made explicit instead of left implicit inside one long, overloaded
@@ -69,15 +85,15 @@ context window.
 ## What we built
 
 Two general-purpose tools, a top-level command that wires them together, and five ready-made
-graphs — each one a working example of a genuinely different shape a graph can take, not a
+graphs, each one a working example of a genuinely different shape a graph can take, not a
 restatement of the same pattern five times. Nothing here is a description of what a graph
 *should* do. Every skill produces a real result: real code that actually runs, real files that
-actually get checked, real tests that actually execute — not an agent's opinion about whether
+actually get checked, real tests that actually execute, not an agent's opinion about whether
 something looks right.
 
 | Skill | What it does | Graph shape it uses |
 |---|---|---|
-| **`graph`** | The single entry point — plans a task and runs it, in one call. `--auto` for hands-off, `--guided` (default) pauses to confirm the specific uncertain decisions before running. | Wraps the two below |
+| **`graph`** | The single entry point: plans a task and runs it, in one call. `--auto` for hands-off, `--guided` (default) pauses to confirm the specific uncertain decisions before running. | Wraps the two below |
 | **`graph-plan`** | Turns any task into an explicit plan: checks whether it's even needed, then context, nodes, contracts, dependencies. | The planning stage itself |
 | **`graph-run`** | Executes a plan (or a task, planning it inline first): nodes in dependency order, each checked, failures repaired and retried without restarting what passed. | The execution stage itself |
 | **`graph-review`** | Reviews a diff or PR from several angles at once, each finding double-checked by a skeptic. | Fixed parallel nodes, each reporting independently |
@@ -88,7 +104,7 @@ something looks right.
 
 ## Installing
 
-All of these are Claude Code skills — drop them into `~/.claude/skills/` to make them
+All of these are Claude Code skills. Drop them into `~/.claude/skills/` to make them
 available in every project, or into a single project's `.claude/skills/` folder to scope them
 to just that project.
 
@@ -104,7 +120,7 @@ cp -r graph-engineering/graph-migrate  ~/.claude/skills/
 cp -r graph-engineering/graph-compare  ~/.claude/skills/
 ```
 
-Claude Code picks them up automatically after that — there's no command to memorize, just ask
+Claude Code picks them up automatically after that. There's no command to memorize, just ask
 in plain language and the right one loads.
 
 ## Examples
@@ -135,36 +151,36 @@ always works as a fallback.
 
 Say you ask: *"review PR 42 for security and correctness, thoroughly."*
 
-1. `graph-review` loads. It checks first whether this is even worth a graph — three
+1. `graph-review` loads. It checks first whether this is even worth a graph: three
    independent concerns (security, correctness, plus whatever else the diff touches) that one
-   reviewer shouldn't judge all at once — yes, it qualifies.
+   reviewer shouldn't judge all at once, so yes, it qualifies.
 2. It picks the reviewer nodes for this diff and shows the plan before running anything:
    ```
    [ ] correctness reviewer
    [ ] security reviewer
    [ ] test-coverage reviewer
    ```
-3. All three run in parallel, each reading only the diff and its one concern — the security
+3. All three run in parallel, each reading only the diff and its one concern: the security
    reviewer never sees "check for typos," the correctness reviewer never sees "check for SQL
    injection." Each reports findings in the same shape: file, line, issue, why it matters.
 4. Every finding then gets a second look from a fresh pass whose only job is to try to
    disprove it. A finding that survives that is far more likely to be real than one only ever
    looked at once. The checklist updates live as this happens:
    ```
-   [✓] correctness reviewer   — passed, 2 findings
-   [✓] security reviewer      — passed, 1 finding
-   [↻] test-coverage reviewer — didn't pass its own check, repairing
+   [✓] correctness reviewer   - passed, 2 findings
+   [✓] security reviewer      - passed, 1 finding
+   [↻] test-coverage reviewer - didn't pass its own check, repairing
    ```
-5. You get back a ranked report — most serious finding first, each with the evidence behind
+5. You get back a ranked report: most serious finding first, each with the evidence behind
    it, plus what the review didn't get to, stated plainly rather than left implicit. Nothing
    in your code changes. You decide what to act on.
 
-That's the same mechanism underneath every skill here — plan, run nodes, check, repair,
-report — just pre-configured differently for each job. `graph-content`'s version of step 4 is
+That's the same mechanism underneath every skill here: plan, run nodes, check, repair,
+report, just pre-configured differently for each job. `graph-content`'s version of step 4 is
 a writer getting sent back with specific feedback instead of a finding getting double-checked.
 `graph-compare`'s version of step 3 is full independent attempts instead of findings.  Once
 you've seen one, you've seen the shape of all of them.
 
 ## License
 
-MIT — use it, change it, ship it.
+MIT. Use it, change it, ship it.
