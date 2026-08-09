@@ -1,12 +1,12 @@
 ---
 name: graph-migrate
-description: Applies the same kind of change across many files or items — one node per item, each making its change and getting checked before it's counted as done, with a consolidated report of what succeeded, what needs a human look, and what was skipped. Use when asked to apply a change across many files, rename or replace something repo-wide, or run the same transformation over a list of items.
+description: Applies the same kind of change across many files or items. One node per item, each making its change and getting checked before it's counted as done, with a consolidated report of what succeeded, what needs a human look, and what was skipped. Use when asked to apply a change across many files, rename or replace something repo-wide, or run the same transformation over a list of items.
 ---
 
 # Graph Migrate
 
 A ready-made `graph-run` configuration where the node count isn't fixed ahead of time like
-`graph-review`'s dimensions — it's however many items are actually in the list, decided when
+`graph-review`'s dimensions. It's however many items are actually in the list, decided when
 the graph is planned, not written into the skill itself.
 
 ## Arguments
@@ -20,37 +20,37 @@ the graph is planned, not written into the skill itself.
 
 ## Before running
 
-If the list has one or two items, just make the change directly — the per-item node,
+If the list has one or two items, just make the change directly. The per-item node,
 check, and repair machinery earns its cost at real scale, not on something you'd do faster by
 hand.
 
-## Step 1 — enumerate the list
+## Step 1: enumerate the list
 
 Before anything runs, produce the actual list of items this will touch and report the count.
-Nothing gets included or excluded silently — if the list looks wrong, this is the point to
+Nothing gets included or excluded silently. If the list looks wrong, this is the point to
 catch it, before any node has started.
 
-## Step 2 — one node per item
+## Step 2: one node per item
 
 Every item gets its own node, all sharing the same contract (what the change should look like
-once correctly applied) and the same instructions — but each node is scoped only to its own
+once correctly applied) and the same instructions, but each node is scoped only to its own
 item. No node reads or touches another item's node.
 
-## Step 3 — check each item
+## Step 3: check each item
 
 Every node's result gets checked against the shared contract: did the change actually apply
 the way it was supposed to, and is the item still otherwise intact.
 
-## Step 4 — repair, per item
+## Step 4: repair, per item
 
-An item that fails its check gets retried — just that item's node, with the specific failure
+An item that fails its check gets retried: just that item's node, with the specific failure
 fed back in. Nothing about the other items is touched by one item's retry. Same judgment call
 as `graph-run`'s Step 4: keep retrying while each attempt is actually closing the gap; the
 moment a retry fails for the same reason the last one did, that's not converging, and it's
-reported as needing a human look rather than tried again with no real change of approach — not
+reported as needing a human look rather than tried again with no real change of approach, not
 forced through, and not silently left half-changed either.
 
-## Step 5 — assemble
+## Step 5: assemble
 
 One consolidated report, item by item: which succeeded, which need a human look, which were
 skipped and why.
