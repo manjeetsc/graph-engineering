@@ -43,19 +43,29 @@ starts adding noise and cost.
 ## Step 2 — run it
 
 Each reviewer node's contract: findings in a consistent shape (file, line, what's wrong, why
-it matters), not a paragraph. Every finding then gets checked by a second, independent node
-whose only job is to try to disprove it — a finding that survives a skeptical second look is
-far more likely to be real than one that was only ever looked at once.
+it matters), not a paragraph. A reviewer node that doesn't meet its own contract — malformed
+output, missing fields — goes through the same repair `graph-run` gives any node: retried with
+the specific gap fed back, escalated to `graph-plan` if the same problem recurs, and reported
+as blocked or stagnant rather than silently dropped if neither resolves it. Only findings from
+a node that met its contract move on.
+
+Every surviving finding then gets checked by a second, independent node — starting clean, none
+of the first reviewer's context carried over, only the finding and the diff itself — whose
+only job is to try to disprove it. A finding that survives that clean second look is far more
+likely to be real than one that was only ever looked at once. One that doesn't survive is
+dropped, not repaired — there's nothing to fix about a false positive, it's just not reported.
 
 On `--depth thorough`, add a pass that ranks the surviving findings by severity, and a last
 pass that asks what wasn't covered — a file that got skipped, a concern nobody checked — so
 nothing is silently left out of the report.
 
-This runs as a background job. You'll get a result rather than watching it live, and you can
-check in on it while it's running. Total cost is bounded by construction — node count (capped
-around five or six) times pass count (one by default, up to three on `--depth thorough`) —
-small enough that a review this size doesn't need a separate spending cap the way a
-longer-running, open-ended graph would.
+This runs as a background job — you don't have to sit and watch it — but progress is still
+narrated live as it happens, the same as any `graph-run` execution: which reviewer nodes have
+finished, which are being repaired and why, shown as it happens rather than saved for the
+final report. Total cost is bounded by construction — node count (capped around five or six)
+times pass count (one by default, up to three on `--depth thorough`) — small enough that a
+review this size doesn't need a separate spending cap the way a longer-running, open-ended
+graph would.
 
 ## Step 3 — report
 
@@ -63,8 +73,9 @@ At default depth, findings come back in the order they were found, each with the
 behind it — not just an opinion, but what was actually found and why it matters — and the
 report states which dimensions and files were actually checked, so the scope is never left
 implicit. On `--depth thorough`, findings are additionally ranked by severity, and a dedicated
-pass reports anything a dimension or file didn't get covered. Nothing is auto-fixed; you
-decide what to act on.
+pass reports anything a dimension or file didn't get covered. Any reviewer node that came back
+blocked or stagnant instead of producing usable findings is named explicitly, not folded
+silently into "no findings." Nothing is auto-fixed; you decide what to act on.
 
 ## Examples
 
@@ -78,8 +89,10 @@ Show me what a review of this would look like       → --dry-run: lists the pla
 
 ## What this refuses to do
 
-- Won't grade a finding with the same reviewer node that raised it — the check is always a
-  different pass.
+- Won't grade a finding with the same reviewer node that raised it, or let that check inherit
+  the reviewer's own context — the check is always a different pass, starting clean.
 - Won't run on a trivial diff just because it was asked to — it'll say so and suggest a plain
   read instead.
-- Won't silently skip a file or concern without saying so in the final report.
+- Won't silently skip a file, a concern, or a node that came back blocked or stagnant without
+  saying so in the final report.
+- Won't go quiet while it runs just because it's a background job.

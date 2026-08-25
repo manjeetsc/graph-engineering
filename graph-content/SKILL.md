@@ -40,10 +40,11 @@ given about the topic.
 
 ## Step 3 — review against the bar, not against taste
 
-The reviewer node is a different pass than the one that wrote it, checking specifically
-against Step 1's bar — not offering a general opinion. Output is a clear pass, or a specific
-list of what's missing or wrong, each item concrete enough that the writer node could act on
-it without guessing what was meant.
+The reviewer node is a different pass than the one that wrote it, starting clean with none of
+the writer's own reasoning carried over, checking specifically against Step 1's bar — not
+offering a general opinion. Output is a clear pass, or a specific list of what's missing or
+wrong, each item concrete enough that the writer node could act on it without guessing what
+was meant.
 
 ## Step 4 — the loop-back edge
 
@@ -59,22 +60,26 @@ as long as each round is actually closing the gap the reviewer named. If a revis
 with the same finding the reviewer already raised — not a new one, the same one, still
 unresolved — that's not converging. Before just stopping, though, ask the same
 execution-vs-planning question `graph-run` asks: is the writer failing to hit a clear bar
-(an execution problem — genuinely stop and report), or is the bar itself unmeetable as
-written — too vague, contradictory, or asking for two things that trade off against each
-other (a planning problem, back in Step 1)? A bar that's the actual source of a stuck loop
-should get revised once, same as any other contract would, rather than exhausting revisions
-against a target that was never fair to begin with. `--max-revisions` is there if you want a
-hard ceiling tighter than that judgment call, but the default isn't a number picked in
-advance — it's however many rounds (and at most one bar revision) are each still making real
-progress. Either way it stops, and stopping without a pass is reported as-is, with the
-reviewer's last set of findings attached, rather than shipped as if it passed.
+(an execution problem — retry it), or is the bar itself unmeetable as written — too vague,
+contradictory, or asking for two things that trade off against each other (a planning problem,
+back in Step 1)? A bar that's the actual source of a stuck loop should get revised once, same
+as any other contract would, rather than exhausting revisions against a target that was never
+fair to begin with.
+
+From there it's the same three-way stop as anywhere else: **passes** (done); **blocked** —
+the bar got revised once and the piece still can't clear it, nowhere left to try; or
+**stagnant** — several rounds recur with the same finding and nothing is actually changing.
+`--max-revisions` is there if you want a hard ceiling tighter than that judgment call, but the
+default isn't a number picked in advance — it's however many rounds (and at most one bar
+revision) are each still making real progress. Whichever of the three ends it, stopping
+without a pass is reported as-is, with the reviewer's last set of findings attached, rather
+than shipped as if it passed.
 
 ## Report
 
 The final draft, whether it passed on its own or after revision, how many revision rounds it
-took, and — if it stopped without passing — why: the same finding recurring unresolved, or a
-`--max-revisions` ceiling, either way with the reviewer's outstanding findings attached so you
-can see exactly what wasn't resolved.
+took, and — if it stopped blocked or stagnant instead of passing — which of the two, with the
+reviewer's outstanding findings attached so you can see exactly what wasn't resolved.
 
 ## Examples
 

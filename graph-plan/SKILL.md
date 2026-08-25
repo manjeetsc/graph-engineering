@@ -43,11 +43,10 @@ job actually requires. This isn't just tidiness — a node handed everything wil
 on something it was never meant to weigh in on, and it's harder to tell afterward which fact
 actually drove which output.
 
-This context lives for one run. Deciding what a single graph is allowed to treat as true is
-this skill's job; remembering something across separate, later runs is a different concern —
-if a task needs that, pair a graph with whatever gives a single agent's loop persistent state
-across runs (a state file it reads and updates each time it's invoked). Don't try to rebuild
-that here; wire the two together instead.
+This context lives for one run by default. Deciding what a single graph is allowed to treat
+as true is this skill's job; if a task genuinely needs to remember something across separate,
+later runs, see "Optional: remembering across separate runs" below rather than assuming every
+graph needs that.
 
 ## Step 2 — break it into nodes
 
@@ -112,14 +111,26 @@ pieces are assembled, which can be more than once: a failure here sends the resp
 node(s) back through repair and reassembly, same as any other failed check, until it passes
 or stops converging.
 
+## Step 7 — check the plan's shape
+
+One more check, and it costs nothing — no model call needed, just reading the plan you just
+built. Before handing anything off: does every node have a real path to an ending (passed,
+blocked, or stagnant — see `graph-run`'s three-way stop), nothing that could just hang with no
+exit? Is every node actually reachable — nothing sitting in the plan that nothing depends on
+and that doesn't feed the assembly rule, a node nobody would ever reach? For any point where
+more than one node's output comes together, is it explicit whether *all* of them are required
+or just *any one*? These are facts about the plan's structure, checkable by reading it, not
+judgment calls about what a node will produce — catch a broken shape here, in five minutes,
+rather than discovering it mid-run.
+
 ## Output
 
 A plan is: the scoped context from Step 1, the node list from Step 2 (with ownership settled
 for anything nodes might collide on) with each one's contract (Step 3) and check (Step 4), the
-assembly rule from Step 5, and the whole-result check from Step 6. State it as a short,
-readable checklist — one line per node, in order, plus the final check — not just as data.
-Hand this to `graph-run` to actually execute it — say so explicitly rather than leaving the
-plan sitting unused.
+assembly rule from Step 5, the whole-result check from Step 6, and confirmation the shape check
+from Step 7 passed. State it as a short, readable checklist — one line per node, in order, plus
+the final check — not just as data. Hand this to `graph-run` to actually execute it — say so
+explicitly rather than leaving the plan sitting unused.
 
 ## Saving a plan for reuse
 
@@ -129,6 +140,29 @@ different runtime — save it as a plain file with everything from Output above:
 nodes, contracts, checks, assembly rule. `graph-run` can load a saved plan directly instead of
 planning inline. This is worth doing when the shape will actually repeat; for a one-off task,
 saving it is just a file nobody reopens — don't do it reflexively just because you can.
+
+## Optional: remembering across separate runs
+
+Most graphs are single-run: start, finish, done. Some tasks genuinely can't finish in one
+sitting — a migration too large to fit in one run, work that has to continue day over day. For
+those, a graph can carry real state across separate invocations without any code, using two
+files under a strict single-writer rule:
+
+- A **progress ledger** — written only by the executing side, one entry per piece of work
+  that finished (passed, blocked, or stagnant). Nothing else ever writes to it.
+- A **directives file** — written only by the supervising/planning side, steering for what
+  the next invocation should pick up. The executing side reads it and never writes to it.
+
+Keep both at a fixed, predictable path so a fresh invocation — a different session, after time
+has passed — can read them cold and continue exactly where the last one stopped, without
+needing any conversation history to carry over. Two files, two exclusive writers, and neither
+ever writes the other's file; that discipline is what keeps the state trustworthy instead of
+becoming one more thing two nodes can corrupt between them.
+
+This is genuinely optional. Reach for it only when a task actually spans separate
+invocations — for anything that finishes in one run, the plain scoped context from Step 1 is
+all you need. Adding a ledger to a task that didn't need one is the same "premature graph"
+mistake, wearing a different costume.
 
 ## Refuses to
 
@@ -142,5 +176,32 @@ saving it is just a file nobody reopens — don't do it reflexively just because
   technically depends on the other's output.
 - Skip Step 6 because every node already has its own check — a whole that's never checked as
   a whole is a real gap, not redundant caution.
+- Skip Step 7 because the plan "looks right." It's a five-minute mechanical read, not an
+  optional formality, and it catches a different class of mistake than Step 6 does.
 - Save a plan to a file reflexively, for a task that's only going to run once. That's the
   same "premature graph" mistake one level up.
+- Set up a progress ledger and directives file for a task that finishes in one run. Same
+  mistake again, in a different costume.
+
+## Examples
+
+```
+Plan this before we run anything: [big/risky task].
+How would you break this down?
+Should this be a graph, or is one agent enough?    → Step 0 may conclude the latter, on
+                                                       its own, and that's a valid outcome
+```
+
+A finished plan reads like a short checklist, not a data dump — for example, a research
+question broken into three independent angles (this is a generic illustration, not any one
+ready-made skill's fixed default set):
+
+```
+[ ] pricing angle   — claim-and-source list, checked by a second pass
+[ ] adoption angle  — claim-and-source list, checked by a second pass
+[ ] risk angle      — claim-and-source list, checked by a second pass
+assembled → one synthesis node combines all three into a single brief
+whole-check → the synthesized brief's claims fact-checked against what the angles found
+```
+
+Hand that to `graph-run` — see its Examples for what actually running it looks like.

@@ -94,4 +94,4 @@ Plan and run: research X, then write a brief   → guided, since it's the defaul
 
 For the two stages on their own, see `graph-plan` and `graph-run`. For ready-made graphs that
 skip planning language entirely, see `graph-review`, `graph-research`, `graph-content`,
-`graph-migrate`, and `graph-compare`.
+`graph-migrate`, `graph-compare`, `graph-build`, and `graph-approve`.

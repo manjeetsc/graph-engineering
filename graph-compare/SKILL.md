@@ -39,16 +39,29 @@ inventing one afterward that happens to favor whichever attempt reads better on 
 Each approach is its own node, and none of them sees what the others produced while it's
 building its own — comparing what actually got built, not one attempt anchored on another.
 
-## Step 4 — judge
+## Step 4 — check each attempt
 
-A separate node — never one of the attempt nodes — scores each attempt against Step 2's
-criteria and either recommends one outright or proposes a synthesis that grafts the strongest
-parts of more than one attempt together, explaining the reasoning either way.
+Before the judge sees anything, every attempt gets checked against the same rule any node
+does: if it produces or changes code, the check means actually building and running it, not
+reading it and guessing whether it works. An attempt that fails its own check goes through
+standard repair — retried with the specific failure fed back, escalated to `graph-plan` if the
+same failure recurs, reported blocked or stagnant rather than silently dropped if neither
+resolves it. Only attempts that actually work reach the judge — comparing a broken attempt
+against a working one isn't a real comparison, it's a foregone conclusion dressed up as one.
+
+## Step 5 — judge
+
+A separate node — never one of the attempt nodes, starting clean with no attempt's own
+reasoning carried over — scores each checked attempt against Step 2's criteria and either
+recommends one outright or proposes a synthesis that grafts the strongest parts of more than
+one attempt together, explaining the reasoning either way. If every attempt failed its Step 4
+check, say so plainly instead of forcing a recommendation among broken options.
 
 ## Report
 
-Every attempt, not just the winner — you can see what was actually tried — plus the judge's
-scoring against each stated criterion and the final recommendation with its reasoning.
+Every attempt, not just the winner — you can see what was actually tried, including which
+ones failed their own check and how — plus the judge's scoring against each stated criterion
+and the final recommendation with its reasoning.
 
 ## Examples
 
@@ -61,6 +74,9 @@ Compare --approaches "rewrite from scratch,incremental refactor" for this module
 
 ## What this refuses to do
 
-- Won't let an attempt's own node also act as part of the judge.
+- Won't let an attempt's own node also act as part of the judge, or let the judge start with
+  any attempt's own reasoning attached.
+- Won't send an unchecked attempt to the judge — code attempts get built and run first.
 - Won't pick a winner without criteria stated first.
-- Won't drop the losing attempts from the report — they're shown, just not chosen.
+- Won't drop the losing attempts, or the ones that failed their own check, from the report —
+  they're shown, just not chosen.

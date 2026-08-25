@@ -1,6 +1,6 @@
 ---
 name: graph-migrate
-description: Applies the same kind of change across many files or items — one node per item, each making its change and getting checked before it's counted as done, with a consolidated report of what succeeded, what needs a human look, and what was skipped. Use when asked to apply a change across many files, rename or replace something repo-wide, or run the same transformation over a list of items.
+description: Applies the same kind of change across many files or items — one node per item, each making its change and getting checked before it's counted as done, with a consolidated report of what passed, what stopped blocked or stagnant, and what never ran. Use when asked to apply a change across many files, rename or replace something repo-wide, or run the same transformation over a list of items.
 ---
 
 # Graph Migrate
@@ -46,14 +46,24 @@ the way it was supposed to, and is the item still otherwise intact.
 An item that fails its check gets retried — just that item's node, with the specific failure
 fed back in. Nothing about the other items is touched by one item's retry. Same judgment call
 as `graph-run`'s Step 4: keep retrying while each attempt is actually closing the gap; the
-moment a retry fails for the same reason the last one did, that's not converging, and it's
-reported as needing a human look rather than tried again with no real change of approach — not
-forced through, and not silently left half-changed either.
+moment a retry fails for the same underlying reason the last one did, that's not converging —
+it escalates to `graph-plan`, once, same as any other node, not tried a third time unchanged.
+If the replanned version still doesn't resolve it, that item is blocked — needing a human look,
+nothing left to try that hasn't already been tried. An item where several rounds instead recur
+with no real change at all — not new failures, not progress, the same state just repeating —
+is stagnant rather than blocked, but gets the same treatment either way: stop retrying it,
+report it plainly, move on to the rest of the list.
+
+If the list itself is too large to finish in one sitting, this is exactly the kind of task
+`graph-plan`'s "Optional: remembering across separate runs" was written for — a progress
+ledger this skill's own executing side writes to, one entry per item, lets a second invocation
+pick up the remaining items cold instead of starting the list over.
 
 ## Step 5 — assemble
 
-One consolidated report, item by item: which succeeded, which need a human look, which were
-skipped and why.
+One consolidated report, item by item: which passed, which stopped blocked or stagnant instead
+(named as one or the other, not folded into one vague "didn't work" bucket), and which were
+never attempted at all because `--on-fail stop` ended the run early.
 
 ## Examples
 

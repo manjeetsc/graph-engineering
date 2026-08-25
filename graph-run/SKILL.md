@@ -69,14 +69,18 @@ releases what it's holding.
 ## Step 3 — check each result
 
 Every node's output gets checked the way its contract said it should: a second pass trying to
-disprove it, or a deterministic check for what the contract required. A result that passes is
-kept and handed to whatever depends on it. A result that fails goes to repair before anything
-downstream of it is allowed to start.
+disprove it, or a deterministic check for what the contract required. That second pass starts
+clean — none of the producing node's own context or reasoning, only the artifact being
+checked, its contract, and whatever the check independently needs. A checker that inherited
+the producer's reasoning would just find that same reasoning convincing a second time; starting
+with nothing shared is what makes the check real instead of a second read of the same
+argument. A result that passes is kept and handed to whatever depends on it. A result that
+fails goes to repair before anything downstream of it is allowed to start.
 
 Zoomed in, this is the same move a single well-built agent already makes on its own — do the
-work, get checked by something independent, don't let the same pass praise itself. A graph
-doesn't invent a new kind of check; it just runs that move once per node instead of once for
-the whole task.
+work, get checked by something independent that isn't carrying the same context, don't let the
+same pass praise itself. A graph doesn't invent a new kind of check; it just runs that move
+once per node instead of once for the whole task.
 
 ## Step 4 — repair, don't restart
 
@@ -102,20 +106,28 @@ it failed is getting addressed, not just tried again with different wording. Tha
 execution problem; keep going. The moment a repair attempt fails for the *same underlying
 reason* it just failed for, it isn't converging — that's the signal it was a planning problem
 the whole time, and the fix is to escalate to `graph-plan`, not to try a third worded-slightly-
-differently attempt at the same level. If escalating to planning and trying again *still*
-doesn't resolve it, that's the actual stop: report exactly what's blocking it, as unresolved,
-rather than escalating again with nowhere left to go. In practice that's usually one retry, or
-one retry plus one escalation — not because a number was picked in advance, but because
-that's how many distinct things are left to try before repeating something that already
-didn't work.
+differently attempt at the same level. In practice that's usually one retry, or one retry plus
+one escalation — not because a number was picked in advance, but because that's how many
+distinct things are left to try before repeating something that already didn't work.
+
+Exactly three things end this, and all three are stops, not different degrees of failure:
+
+- **Passes.** Done.
+- **Blocked** — escalated to planning once, and the replanned version still doesn't resolve
+  it. Nothing left to try that hasn't already been tried.
+- **Stagnant** — several rounds in a row produce no real change: not new failures, not
+  progress, the same state just recurring. Continuing wouldn't be optimism, it would be
+  spending on a shape that already showed you it isn't moving.
+
+Report which of the three happened. None of them get shipped as if they'd passed.
 
 **The backstop, separate from that judgment call:** none of this is allowed to run forever
 even in a pathological case, so carry a hard ceiling underneath the judgment-based rule — on
 total attempts or total spend for one node's repair chain, generous enough that it's never
-what actually ends a normal run. The judgment call above is what decides when to stop in
-practice; the ceiling exists purely so a wrong assumption can't spin unbounded if it does.
-Hitting the ceiling looks the same as the judgment call concluding "not resolvable here": stop
-and report unresolved, don't keep going, and don't ship a failure as if it had passed.
+what actually ends a normal run. The three-way judgment above is what decides when to stop in
+practice — the ceiling is a backstop for a case the judgment call somehow fails to catch, not
+a fourth way to end things. Hitting the ceiling is reported the same as "blocked": stop, report
+unresolved, don't keep going, and don't ship a failure as if it had passed.
 
 ## Step 5 — assemble, then check the whole
 
@@ -128,19 +140,19 @@ brief that's individually sourced but misrepresents the research once combined).
 
 This check loops too, under the exact same rule as Step 4: if it fails, trace the failure to
 the specific node(s) responsible, repair them (same execution-vs-planning judgment call, same
-backstop underneath it), reassemble, and check the whole again — keep going while it's
-converging, stop and report when it isn't. A check that only ever runs once isn't
-verification, it's a formality.
+three-way stop, same backstop underneath it), reassemble, and check the whole again — keep
+going while it's converging, stop (passed / blocked / stagnant) when it isn't. A check that
+only ever runs once isn't verification, it's a formality.
 
 ## Report
 
 The closing summary, after the checklist has already shown the run happening live: which
 nodes ran, which passed on the first try, which needed repair (and what the repair actually
-fixed, and whether that took a plain retry or a planning escalation), which came back
-unresolved, and whether the whole-result check from Step 5 passed — including how many repair
-cycles that took, or why it stopped without passing. None of that gets silently dropped from
-the final result. Nothing beyond what the plan asked for gets changed; if the task was
-"review this" rather than "fix this," nothing is auto-applied.
+fixed, and whether that took a plain retry or a planning escalation), which stopped blocked or
+stagnant instead of passing, and whether the whole-result check from Step 5 passed — including
+how many repair cycles that took, or which of the three stops ended it without passing. None
+of that gets silently dropped from the final result. Nothing beyond what the plan asked for
+gets changed; if the task was "review this" rather than "fix this," nothing is auto-applied.
 
 ## Cost
 
@@ -152,8 +164,9 @@ bolted on top; the stopping rule already is one.
 ## Refuses to
 
 - Restart a node that already passed just because a sibling somewhere else failed.
-- Let a node check its own output — the check is always a different pass.
-- Silently drop a node that never passed. It's reported as unresolved, not omitted.
+- Let a node check its own output, or let a check start with the producing node's context and
+  reasoning still attached — the check is always a different pass, starting clean.
+- Silently drop a node that never passed. It's reported as blocked or stagnant, not omitted.
 - Go quiet between the plan and the final report. Progress is shown as it happens, not
   reconstructed afterward.
 - Keep retrying once an attempt stops converging, on any loop — node-level or whole-check.
@@ -161,7 +174,21 @@ bolted on top; the stopping rule already is one.
 - Treat a planning-shaped failure as another execution retry. Failing for the same underlying
   reason means the contract goes back to planning, not another attempt at the same wording.
 
+## Examples
+
+```
+Run this plan.                                → executes a plan graph-plan just produced
+Just get this done: [task], plan it inline     → small task, no separate planning pass —
+  if it's actually small.                        Step 0 runs first; may conclude no graph
+                                                   is needed at all
+Run the plan saved at .graph/weekly-report.md  → loads a saved plan instead of replanning
+```
+
+A live run looks like the checklist under "While it runs" above — passed/repairing/waiting
+shown as it happens — followed by the closing report: what passed, what got repaired and how,
+and which of passed/blocked/stagnant any unresolved node or the whole-result check ended on.
+
 For a plan produced ahead of time, see `graph-plan`. For ready-made graphs that skip the
 planning step entirely, see `graph-review`, `graph-research`, `graph-content`,
-`graph-migrate`, and `graph-compare` — each is this same mechanism, pre-configured for one
-common job.
+`graph-migrate`, `graph-compare`, `graph-build`, and `graph-approve` — each is this same
+mechanism, pre-configured for one common job.

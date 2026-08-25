@@ -45,8 +45,8 @@ that before doing anything else.
 
 Zoom into any one node here and you'll find something smaller and more familiar: an agent
 doing its work, getting checked, and trying again if it's wrong. That's a loop — one agent,
-running its own discover-do-verify-retry cycle, on its own. People have been calling the
-practice of designing that cycle well "loop engineering": deciding what the agent looks at
+running its own discover-do-verify-retry cycle, on its own. I call the practice of designing
+that cycle well "loop engineering": deciding what the agent looks at
 before it starts, what "done" actually means, and — the part that's easiest to skip and most
 costly to skip — who's allowed to say no to its own work. A loop with no real check is just an
 agent nodding at itself, agreeing that whatever it produced must be fine.
@@ -68,9 +68,9 @@ context window.
 
 ## What we built
 
-Two general-purpose tools, a top-level command that wires them together, and five ready-made
+Two general-purpose tools, a top-level command that wires them together, and seven ready-made
 graphs — each one a working example of a genuinely different shape a graph can take, not a
-restatement of the same pattern five times. Nothing here is a description of what a graph
+restatement of the same pattern seven times. Nothing here is a description of what a graph
 *should* do. Every skill produces a real result: real code that actually runs, real files that
 actually get checked, real tests that actually execute — not an agent's opinion about whether
 something looks right.
@@ -85,6 +85,8 @@ something looks right.
 | **`graph-content`** | Drafts something, reviews it against a stated bar, and loops back to revise until it passes or stops making progress. | Sequential, with a backward edge |
 | **`graph-migrate`** | Applies the same change across a list of files or items, one node per item, checked and repaired individually. | One node per list item, item count decided at plan time |
 | **`graph-compare`** | Tries several approaches to the same problem in parallel, then a judge scores and recommends one. | Parallel full attempts feeding into a judge |
+| **`graph-build`** | Builds something through a strict ordered chain of stages — scaffold, implement, test, document. | A straight sequential chain, no fan-out, no designed loop-back |
+| **`graph-approve`** | Prepares a change fully, fingerprints it, then genuinely pauses mid-execution for a human sign-off before applying anything irreversible. | Sequential, with a real pause built into the middle of it |
 
 ## Installing
 
@@ -102,6 +104,8 @@ cp -r graph-engineering/graph-research ~/.claude/skills/
 cp -r graph-engineering/graph-content  ~/.claude/skills/
 cp -r graph-engineering/graph-migrate  ~/.claude/skills/
 cp -r graph-engineering/graph-compare  ~/.claude/skills/
+cp -r graph-engineering/graph-build    ~/.claude/skills/
+cp -r graph-engineering/graph-approve  ~/.claude/skills/
 ```
 
 Claude Code picks them up automatically after that — there's no command to memorize, just ask
@@ -112,10 +116,10 @@ in plain language and the right one loads.
 **Not sure where to start, or whether you even need this:**
 
 ```
-Should this be a graph, or is one agent enough?
-Plan this out before we run anything.        → graph-plan
-Just run this end to end.                    → graph, guided mode by default
-Run this end to end, auto mode.               → graph --auto
+Should this be a graph, or is one agent enough?  → graph-plan's Step 0 answers this first
+Plan this out before we run anything.             → graph-plan
+Just run this end to end.                         → graph, guided mode by default
+Run this end to end, auto mode.                    → graph --auto
 ```
 
 **Reaching for a specific ready-made job:**
@@ -126,6 +130,8 @@ Research the tradeoffs between these two approaches.             → graph-resea
 Draft a project update and have someone check it before I see it. → graph-content
 Rename this function everywhere it's used in the repo.           → graph-migrate
 Try this two different ways and tell me which is better.         → graph-compare
+Build this feature: scaffold, implement, test, document.         → graph-build
+Prepare the deploy but wait for my okay before pushing it.       → graph-approve
 ```
 
 **If a skill doesn't trigger on its own,** say so directly: "use graph-review on this." That
@@ -135,29 +141,36 @@ always works as a fallback.
 
 Say you ask: *"review PR 42 for security and correctness, thoroughly."*
 
-1. `graph-review` loads. It checks first whether this is even worth a graph — three
+1. `graph-review` loads. It checks first whether this is even worth a graph — several
    independent concerns (security, correctness, plus whatever else the diff touches) that one
-   reviewer shouldn't judge all at once — yes, it qualifies.
-2. It picks the reviewer nodes for this diff and shows the plan before running anything:
+   reviewer shouldn't judge all at once — yes, it qualifies. The word "thoroughly" is what
+   turns on `--depth thorough` — a ranking pass and a "what got missed" pass, on top of the
+   default single pass.
+2. It picks the reviewer nodes for this diff (the default set, since nothing narrowed it) and
+   shows the plan before running anything:
    ```
    [ ] correctness reviewer
    [ ] security reviewer
-   [ ] test-coverage reviewer
+   [ ] simplification reviewer
+   [ ] test coverage reviewer
    ```
-3. All three run in parallel, each reading only the diff and its one concern — the security
+3. All four run in parallel, each reading only the diff and its one concern — the security
    reviewer never sees "check for typos," the correctness reviewer never sees "check for SQL
    injection." Each reports findings in the same shape: file, line, issue, why it matters.
 4. Every finding then gets a second look from a fresh pass whose only job is to try to
    disprove it. A finding that survives that is far more likely to be real than one only ever
    looked at once. The checklist updates live as this happens:
    ```
-   [✓] correctness reviewer   — passed, 2 findings
-   [✓] security reviewer      — passed, 1 finding
-   [↻] test-coverage reviewer — didn't pass its own check, repairing
+   [✓] correctness reviewer     — passed, 2 findings
+   [✓] security reviewer        — passed, 1 finding
+   [✓] simplification reviewer  — passed, 0 findings
+   [↻] test coverage reviewer   — didn't pass its own check, repairing
    ```
-5. You get back a ranked report — most serious finding first, each with the evidence behind
-   it, plus what the review didn't get to, stated plainly rather than left implicit. Nothing
-   in your code changes. You decide what to act on.
+5. Because `--depth thorough` was triggered, two more passes run once the reviewer nodes
+   settle: one ranks the surviving findings by severity, one checks for anything no dimension
+   or file actually got covered. You get back a ranked report — most serious finding first,
+   each with the evidence behind it, plus what the review didn't get to, stated plainly rather
+   than left implicit. Nothing in your code changes. You decide what to act on.
 
 That's the same mechanism underneath every skill here — plan, run nodes, check, repair,
 report — just pre-configured differently for each job. `graph-content`'s version of step 4 is
